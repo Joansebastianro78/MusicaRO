@@ -5,7 +5,11 @@ import AudioVisualizer from './AudioVisualizer';
 import { useAudioAnalyser } from '../hooks/useAudioAnalyser';
 import { Track } from '../types/track';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// In production on Vercel, the client and the /api functions are served
+// from the same domain, so a relative path just works. VITE_API_URL is
+// only needed for edge cases (e.g. pointing a locally-run client at a
+// separately deployed API).
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 export default function MusicPlayer() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -25,7 +29,7 @@ export default function MusicPlayer() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`${API_URL}/api/playlist`)
+    fetch(`${API_BASE}/api/playlist`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
         return res.json() as Promise<Track[]>;
@@ -65,7 +69,7 @@ export default function MusicPlayer() {
     } catch (err) {
       console.error('Playback failed to start:', err);
       setPlaybackError(
-        'No se pudo reproducir el audio. Revisa que audioUrl apunte a un archivo real y accesible (CORS habilitado).'
+        'No se pudo reproducir el audio. Verifica tus credenciales de HookSounds (HOOKSOUNDS_API_KEY / HOOKSOUNDS_API_TOKEN) o que audioUrl apunte a un archivo accesible con CORS habilitado.'
       );
     }
   }, [connectSource, resumeContext]);
@@ -118,7 +122,8 @@ export default function MusicPlayer() {
   if (error || !currentTrack) {
     return (
       <div className="flex h-screen items-center justify-center bg-ink px-6 text-center font-mono text-sm text-wine">
-        {error ?? 'No tracks available.'} Make sure the API is running at {API_URL}.
+        {error ?? 'No tracks available.'} Make sure the /api/playlist function is reachable
+        {API_BASE ? ` at ${API_BASE}` : ''}.
       </div>
     );
   }

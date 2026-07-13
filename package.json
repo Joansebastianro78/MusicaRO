@@ -1,0 +1,20 @@
+{
+  "name": "immersive-music-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproductor de música inmersivo — cliente Vite/React + funciones serverless de Vercel que consumen la API de HookSounds",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "postinstall": "echo 'Root deps installed. Vercel will install client/ deps via the build script.'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@vercel/node": "^3.2.24",
+    "typescript": "^5.5.3",
+    "vercel": "^37.0.0"
+  }
+}
