@@ -10,10 +10,14 @@ export interface Track {
   artist: string;
   audioUrl: string;
   coverUrl: string;
-  /** Beats per minute, when known (HookSounds tracks only). */
+  /** Which catalog this track came from. */
+  source: 'audius' | 'jamendo' | 'fallback';
+  /** Beats per minute, when known. */
   bpm?: number;
-  /** Human readable duration, e.g. "2:26" (HookSounds tracks only). */
+  /** Human readable duration, e.g. "2:26". */
   duration?: string;
-  /** Link to the track's page / licensing info (HookSounds tracks only). */
+  /** Link to the track's page (artist profile, licensing info, etc). */
   sourceUrl?: string;
+  /** License URL/name, when the provider reports one (Jamendo tracks). */
+  license?: string;
 }

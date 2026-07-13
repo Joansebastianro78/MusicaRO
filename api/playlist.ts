@@ -1,6 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { fetchHookSoundsTracks, HookSoundsConfigError } from './_lib/hooksounds';
+import { Track } from './_lib/track';
+import { fetchAudiusTracks } from './_lib/audius';
+import { fetchJamendoTracks, JamendoConfigError } from './_lib/jamendo';
 import { fallbackPlaylist } from './_lib/fallbackPlaylist';
+
+/** Interleaves two lists (a0, b0, a1, b1, ...) instead of concatenating
+ *  them, so the playlist alternates between catalogs rather than
+ *  playing one entire source before the other. */
+function interleave(a: Track[], b: Track[]): Track[] {
+  const out: Track[] = [];
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i++) {
+    if (a[i]) out.push(a[i]);
+    if (b[i]) out.push(b[i]);
+  }
+  return out;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Same-origin in production (client + api are one Vercel project), but
@@ -19,34 +34,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const search = typeof req.query.s === 'string' ? req.query.s : undefined;
-  const limitParam = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+  const genre = typeof req.query.genre === 'string' ? req.query.genre : undefined;
+  const source = typeof req.query.source === 'string' ? req.query.source : 'all';
+  const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) || 12 : 12;
 
-  try {
-    const tracks = await fetchHookSoundsTracks({ search, limit: limitParam });
+  const wantAudius = source === 'all' || source === 'audius';
+  const wantJamendo = source === 'all' || source === 'jamendo';
+  // When mixing both sources, ask each for half so the combined list
+  // still respects the requested total.
+  const perSourceLimit = source === 'all' ? Math.ceil(limit / 2) : limit;
 
-    if (tracks.length === 0) {
-      throw new Error('HookSounds returned no tracks');
-    }
+  const [audiusResult, jamendoResult] = await Promise.allSettled([
+    wantAudius ? fetchAudiusTracks({ search, limit: perSourceLimit, genre }) : Promise.resolve<Track[]>([]),
+    wantJamendo ? fetchJamendoTracks({ search, limit: perSourceLimit }) : Promise.resolve<Track[]>([])
+  ]);
 
-    // Cache at the CDN edge for an hour, and allow serving a stale copy
-    // for up to a day while revalidating in the background — avoids
-    // hitting HookSounds on every page load.
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-    res.status(200).json(tracks);
-  } catch (err) {
-    if (err instanceof HookSoundsConfigError) {
+  const audiusTracks = audiusResult.status === 'fulfilled' ? audiusResult.value : [];
+  const jamendoTracks = jamendoResult.status === 'fulfilled' ? jamendoResult.value : [];
+
+  if (audiusResult.status === 'rejected') {
+    console.error('[api/playlist] Audius request failed:', audiusResult.reason);
+  }
+  if (jamendoResult.status === 'rejected') {
+    if (jamendoResult.reason instanceof JamendoConfigError) {
       console.warn(
-        '[api/playlist] HookSounds credentials missing — serving fallback playlist. ' +
-          'Set HOOKSOUNDS_API_KEY and HOOKSOUNDS_API_TOKEN to use real HookSounds tracks.'
+        '[api/playlist] JAMENDO_CLIENT_ID is not set — skipping Jamendo, serving Audius only. ' +
+          'Get a free client_id at https://devportal.jamendo.com to include Jamendo tracks.'
       );
     } else {
-      console.error('[api/playlist] HookSounds request failed, serving fallback playlist:', err);
+      console.error('[api/playlist] Jamendo request failed:', jamendoResult.reason);
     }
+  }
 
-    // Never hard-fail the endpoint just because HookSounds is
-    // unreachable/misconfigured — degrade to the bundled demo playlist
-    // so the UI stays functional.
+  const combined = interleave(audiusTracks, jamendoTracks).slice(0, limit);
+
+  if (combined.length === 0) {
+    // Neither provider returned anything (both down/misconfigured) —
+    // degrade to the bundled demo playlist so the UI stays functional.
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json(fallbackPlaylist);
+    return;
   }
+
+  // Cache at the CDN edge for 30 minutes, and allow serving a stale copy
+  // for up to a day while revalidating in the background — avoids
+  // hitting Audius/Jamendo on every page load.
+  res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=86400');
+  res.status(200).json(combined);
 }

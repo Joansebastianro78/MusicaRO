@@ -3,19 +3,21 @@
 Reproductor de música inmersivo: un frontend React + TypeScript +
 Tailwind que reproduce música con un visualizador de audio en tiempo
 real (Web Audio API + canvas) y transiciones animadas con Framer
-Motion, alimentado por funciones serverless de **Vercel** que consultan
-la **API de HookSounds**.
+Motion, alimentado por funciones serverless de **Vercel** que combinan
+tracks de **Audius** y **Jamendo**.
 
 ## Estructura
 
 ```
 immersive-music-app/
 ├── api/                      # Funciones serverless de Vercel
-│   ├── playlist.ts           # GET /api/playlist → tracks de HookSounds
+│   ├── playlist.ts           # GET /api/playlist → mezcla Audius + Jamendo
 │   ├── health.ts             # GET /api/health
 │   └── _lib/
-│       ├── hooksounds.ts     # Cliente de la API de HookSounds + mapeo
+│       ├── audius.ts         # Cliente de la API de Audius + mapeo
+│       ├── jamendo.ts        # Cliente de la API de Jamendo + mapeo
 │       ├── fallbackPlaylist.ts
+│       ├── format.ts
 │       └── track.ts
 ├── client/                   # React + TypeScript + Tailwind (Vite)
 │   └── src/
@@ -31,37 +33,44 @@ immersive-music-app/
 └── package.json              # orquesta el build del cliente para Vercel
 ```
 
-Ya no hay un backend Express separado: las rutas `/api/playlist` y
-`/api/health` ahora son [funciones serverless de
-Vercel](https://vercel.com/docs/functions), y el cliente Vite se
-publica como sitio estático. Ambos se despliegan juntos, en el mismo
-dominio, con un solo proyecto de Vercel.
+No hay backend Express separado: `/api/playlist` y `/api/health` son
+[funciones serverless de Vercel](https://vercel.com/docs/functions), y
+el cliente Vite se publica como sitio estático. Ambos se despliegan
+juntos, en el mismo dominio, con un solo proyecto de Vercel.
 
-## 1. Cuenta y credenciales de HookSounds
+## 1. Las dos fuentes de música
 
-`api/_lib/hooksounds.ts` llama a la [API REST de
-HookSounds](https://docs.hooksounds.com/) (`edd-api/products`) para
-traer tracks reales (con mp3 de preview, carátula, bpm, duración,
-etc). Necesitas una API Key y un Token de tu cuenta de HookSounds
-([docs de autenticación](https://docs.hooksounds.com/guides/auth/)).
+`/api/playlist` pide tracks a dos catálogos en paralelo y los
+intercala en una sola playlist:
 
-Esas credenciales son secretas y **solo se usan server-side**, dentro
-de la función `/api/playlist` — nunca viajan al bundle del cliente.
+- **[Audius](https://docs.audius.co/api)** — catálogo abierto y
+  descentralizado. **No requiere ninguna credencial**: las lecturas
+  (buscar, ver trending, reproducir) son públicas. Cada track ya trae
+  una URL de streaming firmada lista para usar. Opcionalmente podés
+  generar una API Key gratis en `audius.co/settings` → Developer Apps
+  y ponerla en `AUDIUS_API_KEY` solo para subir tus límites de rate
+  limit — la app funciona igual sin ella.
+- **[Jamendo](https://developer.jamendo.com/v3.0/docs)** — catálogo de
+  música independiente bajo licencias Creative Commons. Necesita un
+  `client_id` gratuito: registrate en
+  [devportal.jamendo.com](https://devportal.jamendo.com), creá una app
+  y copiá el Client ID a `JAMENDO_CLIENT_ID`.
 
-Copia el ejemplo y complétalo:
+Si `JAMENDO_CLIENT_ID` no está configurado, `/api/playlist` no rompe:
+sigue funcionando solo con Audius (que no necesita nada) y lo indica en
+los logs. Si además Audius fallara, cae a una playlist de respaldo
+(tracks CORS-friendly de `mdn/webaudio-examples`) para que la app
+nunca quede en blanco.
+
+Copiá el ejemplo y completá al menos el de Jamendo (Audius funciona
+out-of-the-box):
 
 ```bash
 cp .env.example .env
 # .env
-HOOKSOUNDS_API_KEY=tu_api_key
-HOOKSOUNDS_API_TOKEN=tu_token
+JAMENDO_CLIENT_ID=tu_client_id
+AUDIUS_API_KEY=            # opcional
 ```
-
-Si estas variables no están configuradas (o la llamada a HookSounds
-falla), `/api/playlist` no rompe: sirve automáticamente una playlist
-de respaldo (tracks CORS-friendly de `mdn/webaudio-examples`) para que
-la app siga siendo usable mientras terminas de configurar las
-credenciales.
 
 ## 2. Desarrollo local con Vercel
 
@@ -80,7 +89,7 @@ ruta relativa, así que todo funciona sin configurar CORS ni URLs.
 
 ### Alternativa: Vite con HMR + `vercel dev` por separado
 
-Si prefieres el hot-reload más rápido de Vite en un terminal aparte:
+Si preferís el hot-reload más rápido de Vite en un terminal aparte:
 
 ```bash
 # terminal 1
@@ -99,8 +108,8 @@ cd client && npm install && npm run dev   # Vite en :5173, con proxy /api → :3
    Vercel](https://vercel.com/new), o corre `vercel` desde la raíz del
    proyecto.
 2. En **Project Settings → Environment Variables**, agrega
-   `HOOKSOUNDS_API_KEY` y `HOOKSOUNDS_API_TOKEN` (Production, Preview y
-   Development).
+   `JAMENDO_CLIENT_ID` (y opcionalmente `AUDIUS_API_KEY`) para
+   Production, Preview y Development.
 3. Vercel detecta `vercel.json`:
    - `buildCommand: npm run build` → instala y compila `client/`
      (`client/dist`).
@@ -112,27 +121,36 @@ cd client && npm install && npm run dev   # Vite en :5173, con proxy /api → :3
      `index.html`, para que el routing del lado del cliente (si algún
      día lo agregas) funcione.
 4. Deploy. Listo: `https://tu-proyecto.vercel.app` sirve el reproductor
-   y `https://tu-proyecto.vercel.app/api/playlist` sirve los tracks de
-   HookSounds.
+   y `https://tu-proyecto.vercel.app/api/playlist` sirve la playlist
+   combinada de Audius + Jamendo.
 
 No hace falta configurar `VITE_API_URL` para el deploy normal — el
 cliente usa rutas relativas (`/api/playlist`), que funcionan porque
-frontend y funciones viven en el mismo dominio de Vercel. Esa variable
-solo existe como escape hatch para casos avanzados (por ejemplo, un
-cliente self-hosted apuntando a una API desplegada en otro dominio).
+frontend y funciones viven en el mismo dominio de Vercel.
 
 ## Endpoint `/api/playlist`
 
-Acepta dos query params opcionales, que se pasan directo a HookSounds:
+Query params opcionales:
 
-- `?s=texto` — búsqueda de texto (parámetro `s` de HookSounds).
-- `?limit=8` — cuántos tracks devolver (parámetro `number`, default 12).
+- `?s=texto` — búsqueda de texto (se pasa como `query` a Audius y como
+  `search` a Jamendo).
+- `?genre=Electronic` — filtra el trending de Audius por género
+  (ignorado si además mandás `s`).
+- `?limit=8` — cuántos tracks devolver en total (default 12). Con
+  `source=all` se reparte a la mitad entre ambos proveedores.
+- `?source=audius` o `?source=jamendo` — para pedir un solo catálogo en
+  vez de la mezcla por defecto (`all`).
 
-Ejemplo: `/api/playlist?s=corporate&limit=6`.
+Ejemplos:
 
-La respuesta se cachea en el edge de Vercel por 1 hora
-(`Cache-Control: s-maxage=3600, stale-while-revalidate=86400`) para no
-golpear la API de HookSounds en cada carga de página.
+- `/api/playlist?s=lofi&limit=10`
+- `/api/playlist?source=jamendo&s=jazz`
+- `/api/playlist?genre=Ambient`
+
+La respuesta trae un campo `source: "audius" | "jamendo" | "fallback"`
+por track, y se cachea en el edge de Vercel por 30 minutos
+(`Cache-Control: s-maxage=1800, stale-while-revalidate=86400`) para no
+golpear ambas APIs en cada carga de página.
 
 ## Cómo funciona el visualizador (resumen técnico)
 
@@ -150,11 +168,14 @@ golpear la API de HookSounds en cada carga de página.
   `audioEl.play()`) vive dentro del `onClick` del `StartOverlay`, no en
   un `useEffect` al montar.
 
-## Nota sobre CORS en los mp3 de HookSounds
+## Nota sobre CORS en los streams de Audius/Jamendo
 
-El `<audio crossOrigin="anonymous">` necesita que los archivos mp3
+El `<audio crossOrigin="anonymous">` necesita que los archivos de audio
 respondan con `Access-Control-Allow-Origin` para que la Web Audio API
-pueda leer sus frecuencias sin marcar el nodo como "tainted". Si algún
-track de HookSounds no lo cumple, la app lo captura y muestra un
-mensaje de error de reproducción en vez de romperse en silencio (ver
-`handleStart` en `MusicPlayer.tsx`).
+pueda leer sus frecuencias sin marcar el nodo como "tainted". Las URLs
+de streaming de Audius están pensadas para reproducirse embebidas en
+sitios de terceros y funcionan bien con esto; si algún track puntual
+(de cualquiera de los dos catálogos) fallara, la app lo captura y
+muestra un error de reproducción en vez de romperse en silencio — solo
+salta al siguiente track con ⏭ (ver `handleStart` en
+`MusicPlayer.tsx`).

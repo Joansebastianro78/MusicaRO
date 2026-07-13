@@ -12,10 +12,15 @@ export interface Track {
   audioUrl: string;
   /** Direct URL to the cover art image. */
   coverUrl: string;
+  /** Which catalog this track came from. */
+  source: 'audius' | 'jamendo' | 'fallback';
   /** Beats per minute, when known. */
   bpm?: number;
   /** Human readable duration, e.g. "2:26". */
   duration?: string;
-  /** Link to the track's page (licensing info, etc). */
+  /** Link to the track's page (artist profile, licensing info, etc). */
   sourceUrl?: string;
+  /** License URL/name, when the provider reports one (mainly Jamendo's
+   *  Creative Commons license links). */
+  license?: string;
 }

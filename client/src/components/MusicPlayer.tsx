@@ -69,7 +69,7 @@ export default function MusicPlayer() {
     } catch (err) {
       console.error('Playback failed to start:', err);
       setPlaybackError(
-        'No se pudo reproducir el audio. Verifica tus credenciales de HookSounds (HOOKSOUNDS_API_KEY / HOOKSOUNDS_API_TOKEN) o que audioUrl apunte a un archivo accesible con CORS habilitado.'
+        'No se pudo reproducir el audio. Puede ser un problema temporal de Audius/Jamendo o de CORS en el archivo — probá con otro track (⏭).'
       );
     }
   }, [connectSource, resumeContext]);
@@ -187,6 +187,11 @@ export default function MusicPlayer() {
               <p className="mt-1 font-mono text-xs uppercase tracking-[0.25em] text-gold/70">
                 {currentTrack.artist}
               </p>
+              {currentTrack.source !== 'fallback' && (
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-cream/30">
+                  via {currentTrack.source === 'audius' ? 'Audius' : 'Jamendo'}
+                </p>
+              )}
             </motion.div>
           </AnimatePresence>
 
