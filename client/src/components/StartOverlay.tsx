@@ -28,7 +28,7 @@ export default function StartOverlay({ visible, onStart, errorMessage }: StartOv
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.5 }}
           >
-            Immersive Music Player
+            MusicRo
           </motion.span>
           <motion.h1
             className="mb-10 font-display text-4xl italic text-cream"
@@ -36,7 +36,7 @@ export default function StartOverlay({ visible, onStart, errorMessage }: StartOv
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25, duration: 0.5 }}
           >
-            Step into the sound
+            Sumérgete en el sonido
           </motion.h1>
           <motion.button
             onClick={onStart}
@@ -47,7 +47,7 @@ export default function StartOverlay({ visible, onStart, errorMessage }: StartOv
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Drop the needle
+            Soltar la aguja
           </motion.button>
           {errorMessage && (
             <motion.p

@@ -114,7 +114,7 @@ export default function MusicPlayer() {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-ink font-mono text-sm text-cream/50">
-        Loading playlist…
+        Cargando playlist…
       </div>
     );
   }
@@ -122,8 +122,8 @@ export default function MusicPlayer() {
   if (error || !currentTrack) {
     return (
       <div className="flex h-screen items-center justify-center bg-ink px-6 text-center font-mono text-sm text-wine">
-        {error ?? 'No tracks available.'} Make sure the /api/playlist function is reachable
-        {API_BASE ? ` at ${API_BASE}` : ''}.
+        {error ?? 'No hay tracks disponibles.'} Verificá que la función /api/playlist esté
+        accesible{API_BASE ? ` en ${API_BASE}` : ''}.
       </div>
     );
   }
@@ -171,7 +171,7 @@ export default function MusicPlayer() {
                 >
                   <img
                     src={currentTrack.coverUrl}
-                    alt={`${currentTrack.title} cover art`}
+                    alt={`Portada de ${currentTrack.title}`}
                     className="h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 rounded-full shadow-[inset_0_0_0_18px_rgba(11,11,15,0.55)]" />
@@ -199,21 +199,21 @@ export default function MusicPlayer() {
             <button
               onClick={() => changeTrack(-1)}
               className="font-mono text-lg text-cream/50 transition hover:text-cream"
-              aria-label="Previous track"
+              aria-label="Track anterior"
             >
               ⏮
             </button>
             <button
               onClick={togglePlay}
               className="flex h-16 w-16 items-center justify-center rounded-full bg-gold text-ink transition hover:scale-105"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
             >
               <span className="text-xl">{isPlaying ? '⏸' : '▶'}</span>
             </button>
             <button
               onClick={() => changeTrack(1)}
               className="font-mono text-lg text-cream/50 transition hover:text-cream"
-              aria-label="Next track"
+              aria-label="Track siguiente"
             >
               ⏭
             </button>

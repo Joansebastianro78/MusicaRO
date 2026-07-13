@@ -17,6 +17,8 @@ function interleave(a: Track[], b: Track[]): Track[] {
   return out;
 }
 
+const MAX_TRACKS = 100;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Same-origin in production (client + api are one Vercel project), but
   // this keeps the endpoint usable if the frontend is ever hosted
@@ -36,7 +38,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const search = typeof req.query.s === 'string' ? req.query.s : undefined;
   const genre = typeof req.query.genre === 'string' ? req.query.genre : undefined;
   const source = typeof req.query.source === 'string' ? req.query.source : 'all';
-  const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) || 12 : 12;
+  // Default to the max (100) — the whole point of combining two catalogs
+  // is having a big playlist. Anything requested above 100 gets clamped.
+  const requestedLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : NaN;
+  const limit =
+    Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(Math.floor(requestedLimit), MAX_TRACKS)
+      : MAX_TRACKS;
 
   const wantAudius = source === 'all' || source === 'audius';
   const wantJamendo = source === 'all' || source === 'jamendo';
